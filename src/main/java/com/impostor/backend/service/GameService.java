@@ -161,6 +161,19 @@ public class GameService {
              broadcastRoomUpdate(room, "No one ejected (Tie).");
         }
 
+        // Check if Impostor wins by 1v1
+        long activePlayers = room.getPlayers().stream()
+                .filter(p -> p.getRole() != Role.SPECTATOR)
+                .count();
+        
+        boolean impostorAlive = room.getPlayers().stream()
+                .anyMatch(p -> p.getRole() == Role.IMPOSTOR);
+
+        if (activePlayers <= 2 && impostorAlive) {
+            finishGame(room, "Impostor Wins! (1v1 Situation)");
+            return;
+        }
+
         // Next Round Logic
         GameState nextState = getNextRound(room.getGameState());
         if (nextState == GameState.FINISHED) {

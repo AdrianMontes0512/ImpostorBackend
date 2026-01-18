@@ -9,7 +9,7 @@ El servidor utiliza **SockJS** y **STOMP** para la comunicación en tiempo real.
 *   **Endpoint WebSocket:** `URL_DEL_BACKEND/ws`
 *   **Librerías recomendadas:** `sockjs-client`, `@stomp/stompjs`
 
-### Ejemplo de conexión (JavaScript/TypeScript)
+### Opción A: SockJS (Recomendada)
 
 ```javascript
 import SockJS from 'sockjs-client';
@@ -21,6 +21,22 @@ const stompClient = Stomp.over(socket);
 stompClient.connect({}, (frame) => {
     console.log('Conectado: ' + frame);
 });
+```
+
+### Opción B: WebSocket Nativo (Si SockJS falla con error 400/403)
+Si tienes problemas de conexión en Cloud Run, usa esta opción directa.
+**Nota:** Usa `wss://` si es HTTPS, y el endpoint es `/ws-native`.
+
+```javascript
+import { Client } from '@stomp/stompjs';
+
+const client = new Client({
+    brokerURL: 'wss://URL_DEL_BACKEND/ws-native',
+    onConnect: () => {
+        console.log('Conectado vía Nativo');
+    },
+});
+client.activate();
 ```
 
 ---
