@@ -20,7 +20,6 @@ const stompClient = Stomp.over(socket);
 
 stompClient.connect({}, (frame) => {
     console.log('Conectado: ' + frame);
-    // Aquí te suscribes a los canales
 });
 ```
 
