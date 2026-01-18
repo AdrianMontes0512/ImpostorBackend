@@ -21,11 +21,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // Endpoint con SockJS (recomendado para compatibilidad)
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*")
-                .withSockJS();
+                .setAllowedOrigins("*")
+                .withSockJS();s
                 
-        // Endpoint WebSocket Nativo (sin SockJS) - Útil si SockJS falla por proxies/headers
         registry.addEndpoint("/ws-native")
-                .setAllowedOriginPatterns("*");
+                .setAllowedOrigins("*");
     }
 }

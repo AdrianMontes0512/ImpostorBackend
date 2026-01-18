@@ -25,15 +25,21 @@ stompClient.connect({}, (frame) => {
 
 ### Opción B: WebSocket Nativo (Si SockJS falla con error 400/403)
 Si tienes problemas de conexión en Cloud Run, usa esta opción directa.
-**Nota:** Usa `wss://` si es HTTPS, y el endpoint es `/ws-native`.
+
+**IMPORTANTE:** Si tu frontend está en HTTPS (como Firebase Hosting), **DEBES** usar `wss://` en lugar de `ws://`.
 
 ```javascript
 import { Client } from '@stomp/stompjs';
 
 const client = new Client({
-    brokerURL: 'wss://URL_DEL_BACKEND/ws-native',
+    // Reemplaza URL_DEL_BACKEND por tu dominio real (ej: mi-app.run.app)
+    // NO incluyas 'http://' o 'https://' aquí, solo el dominio.
+    brokerURL: 'wss://URL_DEL_BACKEND/ws-native', 
     onConnect: () => {
         console.log('Conectado vía Nativo');
+    },
+    onWebSocketError: (error) => {
+        console.error('Error WebSocket:', error);
     },
 });
 client.activate();
