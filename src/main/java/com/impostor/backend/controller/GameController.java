@@ -23,18 +23,19 @@ public class GameController {
 
     @PostMapping("/create")
     public ResponseEntity<Room> createRoom(@RequestBody com.impostor.backend.dto.CreateRoomDTO createRoomDTO) {
-        return ResponseEntity.ok(roomService.createRoom(createRoomDTO.getUsername()));
+        return ResponseEntity.ok(roomService.createRoom(createRoomDTO.getUsername(), createRoomDTO.getMaxRounds()));
     }
 
     @PostMapping("/join/{roomCode}")
-    public ResponseEntity<Player> joinRoom(@PathVariable String roomCode, @RequestBody JoinRoomDTO joinRoomDTO) {
+    public ResponseEntity<com.impostor.backend.dto.JoinResponseDTO> joinRoom(@PathVariable String roomCode,
+            @RequestBody JoinRoomDTO joinRoomDTO) {
         String sessionId = java.util.UUID.randomUUID().toString();
         Player player = roomService.joinRoom(roomCode, joinRoomDTO.getUsername(), sessionId);
-        
+
         Room room = roomService.getRoom(roomCode);
         gameService.broadcastRoomUpdate(room, player.getUsername() + " joined.");
-        
-        return ResponseEntity.ok(player);
+
+        return ResponseEntity.ok(new com.impostor.backend.dto.JoinResponseDTO(player, room));
     }
 
     @MessageMapping("/room/{roomCode}/start")
@@ -56,7 +57,7 @@ public class GameController {
     public void vote(@DestinationVariable String roomCode, @Payload VoteDTO voteDTO) {
         gameService.vote(roomCode, voteDTO.getVoterId(), voteDTO.getVotedPlayerId());
     }
-    
+
     @MessageMapping("/room/{roomCode}/reset")
     public void resetGame(@DestinationVariable String roomCode) {
         gameService.resetGame(roomCode);

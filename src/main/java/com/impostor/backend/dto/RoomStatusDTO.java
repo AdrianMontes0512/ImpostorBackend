@@ -16,4 +16,7 @@ public class RoomStatusDTO {
     private List<Player> players;
     private GameState gameState;
     private String message;
+    private int currentRound;
+    private int maxRounds;
+    private String impostorName;
 }

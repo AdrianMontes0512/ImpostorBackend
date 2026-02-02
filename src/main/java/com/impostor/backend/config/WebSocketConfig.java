@@ -21,10 +21,41 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // Endpoint con SockJS (recomendado para compatibilidad)
         registry.addEndpoint("/ws")
-                .setAllowedOrigins("*")
+                .setAllowedOriginPatterns("*")
+
                 .withSockJS();
-                
+
         registry.addEndpoint("/ws-native")
-                .setAllowedOrigins("*");
+                .setAllowedOriginPatterns("*");
+    }
+
+    @Override
+    public void configureClientInboundChannel(
+            org.springframework.messaging.simp.config.ChannelRegistration registration) {
+        registration.interceptors(new org.springframework.messaging.support.ChannelInterceptor() {
+            @Override
+            public org.springframework.messaging.Message<?> preSend(org.springframework.messaging.Message<?> message,
+                    org.springframework.messaging.MessageChannel channel) {
+                org.springframework.messaging.simp.stomp.StompHeaderAccessor accessor = org.springframework.messaging.support.MessageHeaderAccessor
+                        .getAccessor(message, org.springframework.messaging.simp.stomp.StompHeaderAccessor.class);
+
+                if (accessor != null && org.springframework.messaging.simp.stomp.StompCommand.CONNECT
+                        .equals(accessor.getCommand())) {
+                    Object raw = accessor.getNativeHeader("playerId");
+                    String playerId = null;
+                    if (raw instanceof java.util.List) {
+                        java.util.List<?> list = (java.util.List<?>) raw;
+                        if (!list.isEmpty()) {
+                            playerId = list.get(0).toString();
+                        }
+                    }
+
+                    if (playerId != null) {
+                        accessor.setUser(new StompPrincipal(playerId));
+                    }
+                }
+                return message;
+            }
+        });
     }
 }

@@ -12,24 +12,27 @@ public class Room {
     private List<Player> players = new ArrayList<>();
     private List<WordPool> wordPools = new ArrayList<>();
     private GameState gameState = GameState.LOBBY;
-    
+    private int maxRounds = 3;
+    private int currentRound = 0;
+
     private String impostorId;
-    
+    private String impostorName; // For final reveal
+
     // Suggestions: Map<PlayerId, Suggestion>
     private Map<String, String> categorySuggestions = new ConcurrentHashMap<>();
     private Map<String, String> wordSuggestions = new ConcurrentHashMap<>();
-    
+
     // Selected values
     private String selectedCategory;
     private String selectedWord;
-    
+
     // Map<VoterID, VotedPlayerID>
     private Map<String, String> votes = new ConcurrentHashMap<>();
 
     public Room(String roomCode) {
         this.roomCode = roomCode;
     }
-    
+
     public void reset() {
         this.gameState = GameState.LOBBY;
         this.impostorId = null;

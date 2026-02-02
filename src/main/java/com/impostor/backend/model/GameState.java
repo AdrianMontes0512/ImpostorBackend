@@ -5,8 +5,6 @@ public enum GameState {
     ASSIGN_ROLES,
     CATEGORY_INPUT,
     WORD_INPUT,
-    ROUND_1,
-    ROUND_2,
-    ROUND_3,
+    VOTING,
     FINISHED
 }
