@@ -29,6 +29,14 @@ public class Room {
     // Map<VoterID, VotedPlayerID>
     private Map<String, String> votes = new ConcurrentHashMap<>();
 
+    // First Speaker Logic
+    private String firstSpeakerId;
+    private String previousGameLastFirstSpeakerId;
+
+    // Tie-Breaker Logic
+    private boolean isTieBreaker;
+    private List<String> tiedPlayerIds = new ArrayList<>();
+
     public Room(String roomCode) {
         this.roomCode = roomCode;
     }
@@ -42,5 +50,8 @@ public class Room {
         this.selectedWord = null;
         this.votes.clear();
         this.players.forEach(p -> p.setRole(null));
+        this.firstSpeakerId = null;
+        this.isTieBreaker = false;
+        this.tiedPlayerIds.clear();
     }
 }

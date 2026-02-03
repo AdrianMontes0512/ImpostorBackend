@@ -111,6 +111,9 @@ public class GameService {
 
             room.setGameState(GameState.VOTING);
             room.setCurrentRound(1);
+
+            determineFirstSpeaker(room);
+
             broadcastRoomUpdate(room, "Word Selected! Round 1 Begins.");
 
             // Notify players of the word (Impostor gets ???)
@@ -135,14 +138,28 @@ public class GameService {
         if (voter == null || voter.getRole() == Role.SPECTATOR)
             return; // Spectators can't vote
 
+        if (room.isTieBreaker() && !room.getTiedPlayerIds().contains(votedPlayerId)) {
+            // Can only vote for tied players
+            return;
+        }
+
         room.getVotes().put(voterId, votedPlayerId);
 
         long activePlayers = room.getPlayers().stream()
                 .filter(p -> p.getRole() != Role.SPECTATOR)
                 .count();
 
+        System.out.println("DEBUG: Vote received from " + voterId + " for " + votedPlayerId);
+        System.out.println("DEBUG: Votes: " + room.getVotes().size() + "/" + activePlayers);
+
         if (room.getVotes().size() >= activePlayers) {
-            calculateResults(room);
+            System.out.println("DEBUG: All votes received. Calculating results...");
+            try {
+                calculateResults(room);
+            } catch (Exception e) {
+                System.err.println("ERROR in calculateResults: ");
+                e.printStackTrace();
+            }
         }
     }
 
@@ -150,10 +167,62 @@ public class GameService {
         Map<String, Long> voteCounts = room.getVotes().values().stream()
                 .collect(Collectors.groupingBy(id -> id, Collectors.counting()));
 
-        String ejectedId = voteCounts.entrySet().stream()
-                .max(Map.Entry.comparingByValue())
+        long maxVotes = voteCounts.values().stream().mapToLong(v -> v).max().orElse(0);
+        System.out.println("DEBUG: Max votes: " + maxVotes);
+
+        List<String> maxVoteIds = voteCounts.entrySet().stream()
+                .filter(entry -> entry.getValue() == maxVotes)
                 .map(Map.Entry::getKey)
-                .orElse(null);
+                .collect(Collectors.toList());
+
+        System.out.println("DEBUG: Candidates with max votes: " + maxVoteIds);
+
+        String ejectedId = null;
+
+        if (maxVoteIds.size() > 1) {
+            // Tie detected
+            long activePlayers = room.getPlayers().stream()
+                    .filter(p -> p.getRole() != Role.SPECTATOR)
+                    .count();
+
+            if (activePlayers <= 2) {
+                // Special case: 1v1 Tie -> Impostor Wins (game over) or just continue?
+                // Usually 1v1 tie means Impostor wins as they can't be voted out.
+                // let's stick to standard logic.
+            }
+
+            if (!room.isTieBreaker()) {
+                System.out.println("DEBUG: Triggering Tie-Breaker round.");
+                // First tie -> Trigger Tie Breaker Round
+                room.setTieBreaker(true);
+                room.setTiedPlayerIds(maxVoteIds);
+                room.getVotes().clear();
+
+                // Construct names string
+                String names = room.getPlayers().stream()
+                        .filter(p -> maxVoteIds.contains(p.getId()))
+                        .map(Player::getUsername)
+                        .collect(Collectors.joining(", "));
+
+                System.out.println("DEBUG: Tie-breaker set. Broadcasting update.");
+                broadcastRoomUpdate(room, "Empate! Votación de desempate entre: " + names);
+                return; // Do NOT advance round, stay in VOTING
+            } else {
+                // Second tie (Tie Breaker) -> Random Ejection
+                ejectedId = maxVoteIds.get(new Random().nextInt(maxVoteIds.size()));
+                room.setTieBreaker(false);
+                room.getTiedPlayerIds().clear();
+                broadcastRoomUpdate(room, "Desempate fallido. Expulsión aleatoria.");
+            }
+        } else if (maxVoteIds.size() == 1) {
+            ejectedId = maxVoteIds.get(0);
+            // Ensure tie breaker state is cleared if resolved
+            room.setTieBreaker(false);
+            room.getTiedPlayerIds().clear();
+        } else {
+            // No votes?
+            broadcastRoomUpdate(room, "Nadie votó (Tie).");
+        }
 
         room.getVotes().clear();
 
@@ -168,8 +237,6 @@ public class GameService {
                     broadcastRoomUpdate(room, ejected.getUsername() + " was NOT the Impostor.");
                 }
             }
-        } else {
-            broadcastRoomUpdate(room, "No one ejected (Tie).");
         }
 
         // Check if Impostor wins by 1v1
@@ -192,11 +259,13 @@ public class GameService {
             finishGame(room, "Impostor Survived! Impostor Wins!");
         } else {
             room.setGameState(nextState);
+            determineFirstSpeaker(room);
             broadcastRoomUpdate(room, "Starting Round " + room.getCurrentRound());
         }
     }
 
     private void finishGame(Room room, String message) {
+        room.setPreviousGameLastFirstSpeakerId(room.getFirstSpeakerId());
         room.setGameState(GameState.FINISHED);
         broadcastRoomUpdate(room, message);
     }
@@ -234,7 +303,51 @@ public class GameService {
                 message,
                 room.getCurrentRound(),
                 room.getMaxRounds(),
-                room.getGameState() == GameState.FINISHED ? room.getImpostorName() : null);
+                room.getGameState() == GameState.FINISHED ? room.getImpostorName() : null,
+                room.getFirstSpeakerId(),
+                room.isTieBreaker(),
+                room.getTiedPlayerIds());
         messagingTemplate.convertAndSend("/topic/room/" + room.getRoomCode(), status);
+    }
+
+    private void determineFirstSpeaker(Room room) {
+        List<Player> activePlayers = room.getPlayers().stream()
+                .filter(p -> p.getRole() != Role.SPECTATOR)
+                .collect(Collectors.toList());
+
+        if (activePlayers.isEmpty())
+            return;
+
+        if (room.getCurrentRound() == 1) {
+            String targetId = room.getPreviousGameLastFirstSpeakerId();
+            boolean found = false;
+            if (targetId != null) {
+                for (Player p : activePlayers) {
+                    if (p.getId().equals(targetId)) {
+                        room.setFirstSpeakerId(targetId);
+                        found = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!found) {
+                room.setFirstSpeakerId(activePlayers.get(new Random().nextInt(activePlayers.size())).getId());
+            }
+        } else {
+            String currentSpeakerId = room.getFirstSpeakerId();
+            int index = -1;
+            for (int i = 0; i < activePlayers.size(); i++) {
+                if (activePlayers.get(i).getId().equals(currentSpeakerId)) {
+                    index = i;
+                    break;
+                }
+            }
+
+            // If current speaker not found (e.g. eliminated), index is -1, nextIndex is 0
+            // (first player)
+            int nextIndex = (index + 1) % activePlayers.size();
+            room.setFirstSpeakerId(activePlayers.get(nextIndex).getId());
+        }
     }
 }

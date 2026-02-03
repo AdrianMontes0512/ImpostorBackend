@@ -19,4 +19,8 @@ public class RoomStatusDTO {
     private int currentRound;
     private int maxRounds;
     private String impostorName;
+    private String firstSpeakerId;
+    @com.fasterxml.jackson.annotation.JsonProperty("isTieBreaker")
+    private boolean isTieBreaker;
+    private List<String> tiedPlayerIds;
 }
